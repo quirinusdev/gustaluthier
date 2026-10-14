@@ -1,0 +1,114 @@
+{
+  "rules": {
+    "scroll_remains_primary": true,
+    "floating_is_secondary": true,
+    "desktop_mouse_parallax": true,
+    "touch_mouse_parallax_disabled": true,
+    "active_piece_keeps_floating": true,
+    "active_piece_float_multiplier": 0.35,
+    "active_piece_focus_scale": 1.045,
+    "non_active_opacity_floor": 0.78,
+    "use_transform_only": true,
+    "avoid_filter_animation_except_active_glow": true
+  },
+  "layers": {
+    "00_static_core_remainder_clean.png": {
+      "role": "core",
+      "depth": 0.25,
+      "floatX": 2,
+      "floatY": 3,
+      "rotate": 0.25,
+      "mouseX": 3,
+      "mouseY": 2,
+      "duration": 5.8
+    },
+    "01_upper_left_hardware_clean.png": {
+      "role": "secondary",
+      "depth": 0.85,
+      "floatX": 8,
+      "floatY": 10,
+      "rotate": 1.2,
+      "mouseX": 14,
+      "mouseY": 10,
+      "duration": 4.7
+    },
+    "02_left_body_shell_clean.png": {
+      "role": "major",
+      "depth": 0.65,
+      "floatX": 5,
+      "floatY": 7,
+      "rotate": 0.8,
+      "mouseX": 10,
+      "mouseY": 7,
+      "duration": 5.4
+    },
+    "03_top_right_plate_clean.png": {
+      "role": "major",
+      "depth": 1.0,
+      "floatX": 8,
+      "floatY": 9,
+      "rotate": 1.1,
+      "mouseX": 16,
+      "mouseY": 11,
+      "duration": 4.5
+    },
+    "04_center_electronics_clean.png": {
+      "role": "major",
+      "depth": 0.75,
+      "floatX": 5,
+      "floatY": 6,
+      "rotate": 0.65,
+      "mouseX": 11,
+      "mouseY": 8,
+      "duration": 5.0
+    },
+    "05_right_pickguard_clean.png": {
+      "role": "major",
+      "depth": 0.9,
+      "floatX": 7,
+      "floatY": 8,
+      "rotate": 0.9,
+      "mouseX": 14,
+      "mouseY": 10,
+      "duration": 4.9
+    },
+    "06_lower_right_controls_clean.png": {
+      "role": "secondary",
+      "depth": 1.05,
+      "floatX": 9,
+      "floatY": 11,
+      "rotate": 1.3,
+      "mouseX": 17,
+      "mouseY": 12,
+      "duration": 4.4
+    },
+    "07_lower_shell_hardware_clean.png": {
+      "role": "secondary",
+      "depth": 0.8,
+      "floatX": 7,
+      "floatY": 9,
+      "rotate": 1.0,
+      "mouseX": 13,
+      "mouseY": 9,
+      "duration": 5.2
+    },
+    "08_left_lower_hardware_clean.png": {
+      "role": "secondary",
+      "depth": 1.1,
+      "floatX": 10,
+      "floatY": 12,
+      "rotate": 1.4,
+      "mouseX": 18,
+      "mouseY": 13,
+      "duration": 4.2
+    }
+  },
+  "final_assembly": {
+    "behavior": "cinematic convergence then seamless crossfade to clean assembled guitar",
+    "start_at_timeline_percent": 0.88,
+    "convergence_duration_fraction": 0.08,
+    "crossfade_duration_fraction": 0.04,
+    "assembled_asset": "../04_FINAL_ASSEMBLED/guitar_final_assembled_clean.png",
+    "notes": "Do not attempt an impossible pixel-perfect mechanical assembly from the exploded camera angles. Move all pieces toward the center/assembly zone, reduce rotations, then match-transition/crossfade into the clean assembled guitar so the viewer reads a complete reassembly without a visible jump."
+  }
+}

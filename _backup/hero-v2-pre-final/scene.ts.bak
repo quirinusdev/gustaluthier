@@ -1,0 +1,157 @@
+import parts from "./parts.json";
+
+/** Canvas oficial da foto (todas as coordenadas abaixo estão nesse espaço). */
+export const CANVAS = parts.canvas;
+export const PARTS = parts.parts as Record<PartId, Box>;
+export const COVERS = parts.covers as Record<string, Box>;
+
+export type Box = { x: number; y: number; w: number; h: number };
+export type PartId =
+  | "headstock_focus" | "pickguard_focus"
+  | "pickup_neck" | "pickup_middle" | "pickup_bridge"
+  | "bridge" | "tremolo_arm" | "knob_1" | "knob_2";
+
+export type Label = "intro" | "contexto" | "regulagem" | "manutencao" | "customizacao" | "credibilidade" | "orcamento" | "cta";
+export type ServiceId = "regulagem" | "manutencao" | "customizacao";
+
+/** Pontos de referência da guitarra no canvas 941×1672. */
+const P = {
+  guitar: { x: 472, y: 812 },   // centro do instrumento (headstock → base)
+  nut: { x: 470, y: 430 },      // braço / pestana
+  pickups: { x: 470, y: 1072 },
+  
+  knobs: { x: 600, y: 1212 },
+  
+  bridge: { x: 472, y: 1210 },
+};
+
+/* ---------- Exploded (auditoria v2) ----------
+ * Valores em px de TELA no hero mobile de referência (390×844), conforme a tabela da auditoria.
+ * São convertidos para o espaço do canvas desfazendo rotação/escala do enquadramento "intro",
+ * então no primeiro frame os deslocamentos aparecem exatamente com esses valores e, nas demais
+ * telas/estágios, acompanham proporcionalmente o tamanho da guitarra. */
+const REF = { scale: (0.66 * 844) / 1672, rotation: -20 }; // = câmera "intro" em 390×844
+/** Calibração no DevTools: a tabela da auditoria é ponto de partida; ×1.25 para leitura equivalente ao storyboard. */
+const AMP = 1.25;
+
+type PartPx = { id: PartId; group: ServiceId; x: number; y: number; r?: number; extra: number; rExtra?: number };
+const PART_PX: PartPx[] = [
+  { id: "bridge",        group: "regulagem",    x: 42,  y: 34,  r: 4,  extra: 15 },
+  { id: "tremolo_arm",   group: "regulagem",    x: 34,  y: 20,  r: 8,  extra: 12 },
+  { id: "pickup_neck",   group: "manutencao",   x: -42, y: -12,        extra: 15 },
+  { id: "pickup_middle", group: "manutencao",   x: 34,  y: 0,          extra: 15 },
+  { id: "pickup_bridge", group: "manutencao",   x: -46, y: 14,         extra: 17 },
+  { id: "knob_1",        group: "customizacao", x: 52,  y: -5,  r: 20, extra: 13, rExtra: 30 },
+  { id: "knob_2",        group: "customizacao", x: 60,  y: 28,  r: 25, extra: 13, rExtra: 30 },
+];
+
+function toCanvas(x: number, y: number) {
+  const a = (-REF.rotation * Math.PI) / 180;
+  return { x: (x * Math.cos(a) - y * Math.sin(a)) / REF.scale, y: (x * Math.sin(a) + y * Math.cos(a)) / REF.scale };
+}
+
+/** Peças móveis em unidades do canvas: base (exploded) e deslocamento extra quando ativas. */
+export const MOVABLE = PART_PX.map((p) => {
+  const base = toCanvas(p.x * AMP, p.y * AMP);
+  const len = Math.hypot(p.x, p.y) || 1;
+  const extra = toCanvas((p.x / len) * p.extra, (p.y / len) * p.extra);
+  return { id: p.id, group: p.group, x: base.x, y: base.y, r: p.r ?? 0, ex: extra.x, ey: extra.y, rExtra: p.rExtra ?? 0 };
+});
+
+/** Separação: base = 1 (desde o primeiro frame, mantida em todos os serviços); CTA final recompõe (0). */
+export const EXPLODE = { rest: 1, reduced: 0 };
+/** Escala da peça: "lift" no exploded base (peça vem à frente); 1.10 quando ativa (auditoria: 1.06–1.10). */
+export const LIFT = { rest: 1.06, active: 1.1 };
+
+/** Centro de uma peça no canvas, já com o deslocamento de foco aplicado (hotspot acompanha a peça). */
+function activePartCenter(id: PartId) {
+  const b = PARTS[id];
+  const m = MOVABLE.find((p) => p.id === id)!;
+  return { x: b.x + b.w / 2 + m.x + m.ex, y: b.y + b.h / 2 + m.y + m.ey };
+}
+
+export type Camera = { x: number; y: number; rotation: number; scale: number };
+export type Shot = {
+  camera: Camera;
+  /** opacidade do véu escuro sobre a foto base (peças ficam acima dele) */
+  dim: number;
+  /** degradês de leitura */
+  shadeTop: number;
+  shadeBottom: number;
+  shadeFull: number;
+  focus: ServiceId | null;
+  explode: number;
+  /** ponto do hotspot (em px da viewport) quando o estágio é de serviço */
+  hotspot?: { x: number; y: number };
+};
+
+type ShotDef = {
+  f: { x: number; y: number }; // ponto focal no canvas
+  v: [number, number];         // posição na viewport (fração)
+  s: number;                   // escala relativa à altura (u = vh / 1672)
+  r: number;                   // rotação em graus
+  dim: number; shadeTop: number; shadeBottom: number; shadeFull: number;
+  focus: ServiceId | null; explode: number;
+  hs?: { x: number; y: number };
+};
+
+/** Projeta um ponto do canvas na viewport, para uma câmera (origem 0 0, ordem translate→rotate→scale). */
+export function project(c: Camera, p: { x: number; y: number }) {
+  const a = (c.rotation * Math.PI) / 180;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  return { x: c.x + c.scale * (p.x * cos - p.y * sin), y: c.y + c.scale * (p.x * sin + p.y * cos) };
+}
+
+function frame(f: { x: number; y: number }, vx: number, vy: number, s: number, r: number): Camera {
+  const a = (r * Math.PI) / 180;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  return { x: vx - s * (f.x * cos - f.y * sin), y: vy - s * (f.x * sin + f.y * cos), rotation: r, scale: s };
+}
+
+export function isWide(vw: number, vh: number) {
+  return vw >= 900 && vw / vh > 1.05;
+}
+
+/** Enquadramentos por label. Mobile é a referência; desktop desloca a guitarra
+ *  para a direita e libera a coluna esquerda para o conteúdo. */
+export function getShots(vw: number, vh: number): Record<Label, Shot> {
+  const wide = isWide(vw, vh);
+  // escala base: pela altura, limitada pela largura em telas muito estreitas
+  const u = Math.min(vh / 1672, (vw / 941) * 1.12);
+  const gx = wide ? 0.66 : 0.5; // eixo horizontal da guitarra
+
+  const defs: Record<Label, ShotDef> = wide
+    ? {
+        intro:        { f: P.guitar,    v: [gx, 0.52], s: 0.98, r: -20, dim: 0.24, shadeTop: 0, shadeBottom: 0.2, shadeFull: 0, focus: null, explode: EXPLODE.rest },
+        contexto:     { f: P.pickups,   v: [gx, 0.56], s: 1.55, r: 12,  dim: 0.18, shadeTop: 0, shadeBottom: 0.2, shadeFull: 0, focus: null, explode: EXPLODE.rest },
+        regulagem:    { f: P.guitar,    v: [gx, 0.54], s: 0.98, r: 20,  dim: 0.45, shadeTop: 0, shadeBottom: 0.1, shadeFull: 0, focus: "regulagem", explode: EXPLODE.rest, hs: P.nut },
+        manutencao:   { f: P.pickups,   v: [gx, 0.5],  s: 1.6,  r: 16,  dim: 0.5,  shadeTop: 0, shadeBottom: 0.1, shadeFull: 0, focus: "manutencao", explode: EXPLODE.rest, hs: activePartCenter("pickup_middle") },
+        customizacao: { f: P.knobs,     v: [gx, 0.5],  s: 1.8,  r: 10,  dim: 0.5,  shadeTop: 0, shadeBottom: 0.1, shadeFull: 0, focus: "customizacao", explode: EXPLODE.rest, hs: activePartCenter("knob_1") },
+        credibilidade:{ f: P.bridge,    v: [gx, 0.48], s: 2.4,  r: -6,  dim: 0.3,  shadeTop: 0, shadeBottom: 0.3, shadeFull: 0.15, focus: null, explode: EXPLODE.rest },
+        orcamento:    { f: P.pickups,   v: [gx, 0.5],  s: 2.0,  r: -10, dim: 0.5,  shadeTop: 0, shadeBottom: 0.3, shadeFull: 0.55, focus: null, explode: EXPLODE.rest },
+        cta:          { f: P.guitar,    v: [gx, 0.5],  s: 0.92, r: 0,   dim: 0.05, shadeTop: 0, shadeBottom: 0.2, shadeFull: 0, focus: null, explode: EXPLODE.reduced },
+      }
+    : {
+        intro:        { f: P.guitar,    v: [0.5, 0.345], s: 0.66,  r: -20, dim: 0.24, shadeTop: 0, shadeBottom: 1, shadeFull: 0, focus: null, explode: EXPLODE.rest },
+        contexto:     { f: P.pickups,   v: [0.52, 0.72], s: 1.3,  r: 12,  dim: 0.2,  shadeTop: 1, shadeBottom: 0.9, shadeFull: 0, focus: null, explode: EXPLODE.rest },
+        regulagem:    { f: P.guitar,    v: [0.55, 0.6],  s: 0.88, r: 20,  dim: 0.3, shadeTop: 0.9, shadeBottom: 0.4, shadeFull: 0, focus: "regulagem", explode: EXPLODE.rest, hs: P.nut },
+        manutencao:   { f: P.pickups,   v: [0.58, 0.6],  s: 1.12, r: 16,  dim: 0.34,  shadeTop: 0.9, shadeBottom: 0.4, shadeFull: 0, focus: "manutencao", explode: EXPLODE.rest, hs: activePartCenter("pickup_middle") },
+        customizacao: { f: P.knobs,     v: [0.5, 0.54],  s: 1.1,  r: 10,  dim: 0.34,  shadeTop: 0.9, shadeBottom: 0.4, shadeFull: 0, focus: "customizacao", explode: EXPLODE.rest, hs: activePartCenter("knob_1") },
+        credibilidade:{ f: P.bridge,    v: [0.5, 0.21],  s: 2.0,  r: -6,  dim: 0.25, shadeTop: 0.5, shadeBottom: 1, shadeFull: 0, focus: null, explode: EXPLODE.rest },
+        orcamento:    { f: P.pickups,   v: [0.5, 0.2],   s: 2.1,  r: -10, dim: 0.6,  shadeTop: 0.5, shadeBottom: 1, shadeFull: 0.6, focus: null, explode: EXPLODE.rest },
+        cta:          { f: P.guitar,    v: [0.5, 0.3],   s: 0.5,  r: 0,   dim: 0.05, shadeTop: 0, shadeBottom: 1, shadeFull: 0, focus: null, explode: EXPLODE.reduced },
+      };
+
+  const out = {} as Record<Label, Shot>;
+  (Object.keys(defs) as Label[]).forEach((k) => {
+    const d = defs[k];
+    const camera = frame(d.f, d.v[0] * vw, d.v[1] * vh, d.s * u, d.r);
+    out[k] = {
+      camera,
+      dim: d.dim, shadeTop: d.shadeTop, shadeBottom: d.shadeBottom, shadeFull: d.shadeFull,
+      focus: d.focus, explode: d.explode,
+      hotspot: d.hs ? project(camera, d.hs) : undefined,
+    };
+  });
+  return out;
+}

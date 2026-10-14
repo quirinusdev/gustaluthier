@@ -1,0 +1,66 @@
+import { CANVAS, COVERS, MOVABLE, PARTS, type Box } from "@/lib/scene";
+
+const A = "/assets";
+const pos = (b: Box) => ({ left: b.x, top: b.y, width: b.w, height: b.h });
+
+/** Covers do pacote + reaplicação do cover_bridge 22px abaixo: a placa original da ponte vai até
+ *  y≈1286, além do cover (1267). Reutiliza o asset existente para não sobrar ponte duplicada na origem. */
+const COVER_LAYERS = [
+  ...Object.keys(COVERS).map((id) => ({ key: id, id, box: COVERS[id] })),
+  { key: "bridge-low", id: "bridge", box: { ...COVERS.bridge, y: COVERS.bridge.y + 22 } },
+];
+
+/**
+ * Stage da narrativa (camadas, de baixo para cima):
+ * fundo → [rig/câmera: foto base → covers → véu → foco headstock → foco pickguard + covers do foco → glow → peças]
+ * → degradês de leitura → vinheta → grain → hotspots + linhas.
+ */
+export default function GuitarStage() {
+  return (
+    <div className="stage" aria-hidden="true">
+      <div className="stage-inner">
+        <div className="stage-bg" />
+        <div className="rig" style={{ width: CANVAS.w, height: CANVAS.h }}>
+          <img className="scene" src={`${A}/scene.webp`} width={CANVAS.w} height={CANVAS.h} alt="" fetchPriority="high" decoding="async" />
+          {COVER_LAYERS.map((c) => (
+            <img key={c.key} className="layer cover" src={`${A}/cover-${c.id}.webp`} style={pos(c.box)} alt="" />
+          ))}
+          <div className="dim" />
+          <img className="layer focus-layer" data-focus="headstock" src={`${A}/part-headstock_focus.webp`} style={pos(PARTS.headstock_focus)} alt="" />
+          <div className="focus-group" data-focus="pickguard">
+            <img className="layer focus-layer-pg" src={`${A}/part-pickguard_focus.webp`} style={pos(PARTS.pickguard_focus)} alt="" />
+            {COVER_LAYERS.map((c) => (
+              <img key={c.key} className="layer cover" src={`${A}/cover-${c.id}.webp`} style={pos(c.box)} alt="" />
+            ))}
+          </div>
+          <img className="layer glow" data-glow="customizacao" src={`${A}/fx-glow_red_soft.webp`} style={{ left: 380, top: 1000, width: 440, height: 440 }} alt="" />
+          {MOVABLE.map((p) => (
+            <div key={p.id} className="part" data-part={p.id} data-group={p.group} style={pos(PARTS[p.id])}>
+              <div className="part-inner">
+                <img src={`${A}/part-${p.id}.webp`} alt="" />
+                {/* silhueta escura: "sem foco" via opacity (sem animar filter) */}
+                <img className="part-shade" src={`${A}/part-${p.id}.webp`} alt="" />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="shade shade-top" />
+        <div className="shade shade-bottom" />
+        <div className="shade shade-full" />
+        <div className="vignette" />
+        <div className="grain" />
+        <svg className="leaders" width="100%" height="100%">
+          {["regulagem", "manutencao", "customizacao"].map((id) => (
+            <path key={id} data-line={id} pathLength={1} />
+          ))}
+        </svg>
+        {["regulagem", "manutencao", "customizacao"].map((id) => (
+          <div key={id} className="hotspot" data-hotspot={id}>
+            <img src={`${A}/fx-hotspot_ring_red.webp`} alt="" />
+            <span className="hotspot-dot" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,250 @@
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { LIFT, MOVABLE, PARTS, getShots, isWide, project, type Label, type ServiceId, type Shot } from "./scene";
+
+const SERVICES: ServiceId[] = ["regulagem", "manutencao", "customizacao"];
+const ORDER: Label[] = ["intro", "contexto", "regulagem", "manutencao", "customizacao", "credibilidade", "orcamento", "cta"];
+
+const clamp = (min: number, max: number, v: number) => Math.min(max, Math.max(min, v));
+
+/**
+ * Monta a narrativa sobre o DOM já renderizado.
+ * Timeline única, scrubbed, em que 1 unidade de tempo = 1px de scroll:
+ * as labels caem exatamente na posição de cada seção → determinística e reversível.
+ * motion=false (prefers-reduced-motion): mesmos estados, aplicados sem animação.
+ */
+export function buildNarrative(root: HTMLElement, motion: boolean, assetsReady = true) {
+  const q = gsap.utils.selector(root);
+  const one = <T extends Element = HTMLElement>(sel: string) => q(sel)[0] as unknown as T;
+
+  const vw = document.documentElement.clientWidth;
+  const vh = one(".panel-sticky").offsetHeight; // 100svh real
+  const wide = isWide(vw, vh);
+  const shots = getShots(vw, vh);
+
+  const rig = one(".rig");
+  const dim = one(".dim");
+  const shadeTop = one(".shade-top");
+  const shadeBottom = one(".shade-bottom");
+  const shadeFull = one(".shade-full");
+  const head = one('[data-focus="headstock"]');
+  const pickguard = one('[data-focus="pickguard"]');
+  const glow = one('[data-glow="customizacao"]');
+  const parts = MOVABLE.map((p) => {
+    const el = one(`[data-part="${p.id}"]`);
+    return { ...p, el, shade: el.querySelector<HTMLElement>(".part-shade")! };
+  });
+
+  /* ---------- estados ---------- */
+  const partVars = (shot: Shot, p: (typeof parts)[number]) => {
+    // peças nunca remontam entre serviços: base exploded sempre; a ativa ganha deslocamento extra
+    const active = shot.focus === p.group;
+    const k = shot.explode;
+    return {
+      x: p.x * k + (active ? p.ex : 0),
+      y: p.y * k + (active ? p.ey : 0),
+      rotation: p.r * k + (active ? p.rExtra : 0),
+      scale: active ? LIFT.active : 1 + (LIFT.rest - 1) * k,
+    };
+  };
+  /** "sem foco" = silhueta escura por cima (opacity), em vez de animar filter */
+  const shadeVars = (shot: Shot, p: (typeof parts)[number]) => ({
+    opacity: shot.focus && shot.focus !== p.group ? 0.5 : 0,
+  });
+  const layerVars = (shot: Shot) => ({
+    dim: { opacity: shot.dim },
+    top: { opacity: shot.shadeTop },
+    bottom: { opacity: shot.shadeBottom },
+    full: { opacity: shot.shadeFull },
+    head: { opacity: shot.focus === "regulagem" ? 1 : 0 },
+    pickguard: { opacity: shot.focus === "customizacao" ? 1 : 0, scale: shot.focus === "customizacao" ? 1.012 : 1 },
+    glow: { opacity: shot.focus === "customizacao" ? 0.85 : 0 },
+  });
+
+  /* ---------- hotspots, cards e linhas (coordenadas de viewport) ---------- */
+  const headBottom = (() => {
+    const h = one(".services-head");
+    return h.offsetTop + h.offsetHeight;
+  })();
+  const ui: Record<ServiceId, { hs: HTMLElement; card: HTMLElement; line: SVGPathElement }> = {} as never;
+  SERVICES.forEach((id) => {
+    const hsPt = shots[id].hotspot!;
+    const hs = one(`[data-hotspot="${id}"]`);
+    const card = one(`[data-card="${id}"]`);
+    const line = one<SVGPathElement>(`[data-line="${id}"]`);
+    const w = card.offsetWidth, h = card.offsetHeight, m = 16;
+    let x: number, y: number;
+    if (wide) {
+      // card à esquerda da silhueta do corpo projetada (nunca sobre o instrumento)
+      const body = [{ x: 300, y: 880 }, { x: 240, y: 1000 }, { x: 235, y: 1200 }, { x: 262, y: 1400 }];
+      const bodyLeft = Math.min(...body.map((p) => project(shots[id].camera, p).x));
+      x = Math.min(hsPt.x - w - 120, bodyLeft - w - 36);
+      y = hsPt.y - h / 2;
+    } else {
+      const toLeft = hsPt.x > vw / 2;
+      x = toLeft ? m : vw - m - w;
+      const dy = { regulagem: 36, manutencao: -h - 64, customizacao: 72 }[id];
+      y = hsPt.y + dy;
+    }
+    x = clamp(m, vw - w - m, x);
+    y = clamp(headBottom + 16, vh - h - 24, y);
+    if (!wide) {
+      // o card nunca cobre as peças em foco (agora mais separadas): sobe acima delas ou desce abaixo
+      const cam = shots[id].camera;
+      const zones = parts.filter((p) => p.group === id).map((p) => {
+        const b = PARTS[p.id];
+        const c = project(cam, { x: b.x + b.w / 2 + p.x + p.ex, y: b.y + b.h / 2 + p.y + p.ey });
+        const r = (Math.hypot(b.w, b.h) / 2) * LIFT.active * cam.scale;
+        return { l: c.x - r, r: c.x + r, t: c.y - r, b: c.y + r };
+      });
+      const hits = (yy: number) => zones.some((z) => !(x + w < z.l || x > z.r || yy + h < z.t || yy > z.b));
+      if (hits(y)) {
+        const above = Math.min(...zones.map((z) => z.t)) - h - 12;
+        const below = Math.max(...zones.map((z) => z.b)) + 12;
+        y = above >= headBottom + 16 ? above : clamp(headBottom + 16, vh - h - 24, below);
+      }
+    }
+    gsap.set(hs, { x: hsPt.x, y: hsPt.y, xPercent: -50, yPercent: -50, autoAlpha: 0 });
+    gsap.set(card, { x, y, autoAlpha: 0 });
+    // linha: do anel do hotspot até a borda vertical mais próxima do card
+    const ax = x + w / 2 < hsPt.x ? x + w : x;
+    const ay = clamp(y + 18, y + h - 18, hsPt.y);
+    const a = Math.atan2(ay - hsPt.y, ax - hsPt.x);
+    const r = 17;
+    line.setAttribute("d", `M${(hsPt.x + Math.cos(a) * r).toFixed(1)},${(hsPt.y + Math.sin(a) * r).toFixed(1)} L${ax.toFixed(1)},${ay.toFixed(1)}`);
+    gsap.set(line, { strokeDasharray: 1, strokeDashoffset: 1, autoAlpha: 0 });
+    ui[id] = { hs, card, line };
+  });
+
+  /* ---------- CTA: guitarra montada cabe entre o header e o título no fim do scroll ---------- */
+  if (!wide) {
+    const maxScroll = ScrollTrigger.maxScroll(window);
+    const titleTop = one("#contato .display").getBoundingClientRect().top + window.scrollY - maxScroll;
+    const top = (document.querySelector<HTMLElement>(".site-header")?.offsetHeight ?? 68) + 4;
+    const bottom = titleTop + 8; // a base do instrumento pode tocar o chão atrás do título
+    const s = Math.min(shots.cta.camera.scale, (bottom - top) / 1335); // 1335 = altura da guitarra no canvas
+    shots.cta.camera = { x: vw / 2 - s * 472, y: (top + bottom) / 2 - s * 812, rotation: 0, scale: s };
+  }
+
+  /* ---------- aplicar um estado instantaneamente ---------- */
+  const apply = (label: Label) => {
+    const s = shots[label];
+    gsap.set(rig, { ...s.camera, transformOrigin: "0 0", force3D: true });
+    const l = layerVars(s);
+    gsap.set(dim, l.dim); gsap.set(shadeTop, l.top); gsap.set(shadeBottom, l.bottom); gsap.set(shadeFull, l.full);
+    gsap.set(head, l.head); gsap.set(pickguard, { ...l.pickguard, transformOrigin: "50% 60%" }); gsap.set(glow, l.glow);
+    parts.forEach((p) => { gsap.set(p.el, { ...partVars(s, p), force3D: true }); gsap.set(p.shade, shadeVars(s, p)); });
+    SERVICES.forEach((id) => {
+      const on = s.focus === id;
+      gsap.set([ui[id].hs, ui[id].card, ui[id].line], { autoAlpha: on ? 1 : 0 });
+      gsap.set(ui[id].line, { strokeDashoffset: on ? 0 : 1 });
+    });
+  };
+  apply("intro");
+  // Assets do hero ainda decodificando: só o estado inicial; o ScrollTrigger nasce depois
+  if (!assetsReady) return;
+
+  /* ---------- posições (px de scroll) ---------- */
+  const top = (sel: string) => one(sel).offsetTop;
+  const max = ScrollTrigger.maxScroll(window);
+  const tAbout = top("#quem-somos");
+  const tSvc = top("#servicos");
+  const svcHold = one("#servicos").offsetHeight - vh;
+  const tCred = top("#trabalho");
+  const tOrc = top("#orcamento");
+  const tCta = Math.min(top("#contato"), max);
+
+  const seg: Record<Exclude<Label, "intro">, [number, number]> = {
+    contexto: [tAbout - vh * 0.9, vh * 0.9],
+    regulagem: [tSvc - vh * 0.9, vh * 0.9],
+    manutencao: [tSvc + svcHold * 0.24, svcHold * 0.17],
+    customizacao: [tSvc + svcHold * 0.6, svcHold * 0.17],
+    credibilidade: [tSvc + svcHold, tCred - tSvc - svcHold],
+    orcamento: [tOrc - vh, vh * 0.8],
+    cta: [tCta - vh * 0.9, vh * 0.9],
+  };
+
+  if (!motion) {
+    // Reduced motion: troca de estado discreta, sem movimento
+    ORDER.slice(1).forEach((label, i) => {
+      const [s, d] = seg[label as Exclude<Label, "intro">];
+      ScrollTrigger.create({
+        start: s + d / 2,
+        end: "max",
+        onEnter: () => apply(label),
+        onLeaveBack: () => apply(ORDER[i]),
+      });
+    });
+    return;
+  }
+
+  // ease "none" em tudo que é ligado ao scroll: a suavidade vem só do scrub
+  const tl = gsap.timeline({ defaults: { ease: "none", force3D: true } });
+  const u = vh; // atalho legível: frações de viewport
+
+  // Copy das telas presas (entra/sai com o scroll + opacidade)
+  tl.to(q(".intro-copy"), { autoAlpha: 0, duration: 0.45 * u }, 0.2 * tAbout);
+  tl.fromTo(q(".about-copy, .instruments"), { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.45 * u }, tAbout - 0.5 * u);
+  tl.to(q(".about-copy, .instruments"), { autoAlpha: 0, duration: 0.4 * u }, tSvc - 0.85 * u);
+  tl.fromTo(q(".services-head"), { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 * u }, tSvc - 0.45 * u);
+
+  (Object.keys(seg) as Exclude<Label, "intro">[]).forEach((label) => {
+    const [start, dur] = seg[label];
+    const s = shots[label];
+    const end = start + dur;
+    const prev = ORDER[ORDER.indexOf(label) - 1];
+    const l = layerVars(s);
+
+    // 5. atenuar foco anterior (sai primeiro para não "flutuar" durante o movimento)
+    const prevFocus = shots[prev].focus;
+    if (prevFocus) {
+      tl.to([ui[prevFocus].card, ui[prevFocus].hs, ui[prevFocus].line], { autoAlpha: 0, duration: 0.12 * u }, start);
+    }
+    // 1. câmera / enquadramento
+    tl.to(rig, { ...s.camera, duration: dur }, start);
+    tl.to(dim, { ...l.dim, duration: dur * 0.7 }, start);
+    tl.to(shadeTop, { ...l.top, duration: dur * 0.6 }, start + dur * 0.2);
+    tl.to(shadeBottom, { ...l.bottom, duration: dur * 0.6 }, start + dur * 0.2);
+    tl.to(shadeFull, { ...l.full, duration: dur * 0.6 }, start + dur * 0.2);
+    // 2. destacar peça/área ativa
+    tl.to(head, { ...l.head, duration: dur * 0.5 }, start + dur * 0.4);
+    tl.to(pickguard, { ...l.pickguard, duration: dur * 0.5 }, start + dur * 0.4);
+    tl.to(glow, { ...l.glow, duration: dur * 0.5 }, start + dur * 0.45);
+    parts.forEach((p) => {
+      tl.to(p.el, { ...partVars(s, p), duration: dur * 0.65 }, start + dur * 0.3);
+      tl.to(p.shade, { ...shadeVars(s, p), duration: dur * 0.5 }, start + dur * 0.35);
+    });
+    // 3. hotspot → 4. linha + card
+    if (s.focus) {
+      const f = ui[s.focus];
+      tl.to(f.hs, { autoAlpha: 1, duration: 0.08 * u }, end - 0.04 * u);
+      tl.set(f.line, { autoAlpha: 1 }, end + 0.02 * u);
+      tl.to(f.line, { strokeDashoffset: 0, duration: 0.1 * u }, end + 0.02 * u);
+      tl.to(f.card, { autoAlpha: 1, duration: 0.1 * u }, end + 0.08 * u);
+    }
+    tl.addLabel(label, end);
+  });
+  tl.addLabel("intro", 0);
+  tl.set({}, {}, max); // duração = altura rolável → tempo == px
+
+  ScrollTrigger.create({
+    id: "narrative",
+    animation: tl,
+    start: 0,
+    end: max,
+    scrub: 0.55, // resposta mais imediata, ainda cinematográfica (auditoria v2: 0.45–0.65)
+  });
+
+  // Primeiro frame já em exploded (≥85%); o load só assenta o restante — o scroll não inicia a explosão
+  if (window.scrollY < 40) {
+    parts.forEach((p) => {
+      gsap.from(p.el.firstElementChild, {
+        x: -p.x * 0.15, y: -p.y * 0.15, rotation: -p.r * 0.15,
+        duration: 1.2, ease: "power2.out", delay: 0.2,
+      });
+    });
+    // headline (LCP) entra só com deslocamento — nunca a partir de opacidade 0
+    gsap.from(q(".intro-copy h1 .reveal"), { y: 14, duration: 0.9, ease: "power2.out", stagger: 0.06 });
+    gsap.from(q(".intro-copy > .reveal"), { autoAlpha: 0, y: 18, duration: 0.9, ease: "power2.out", stagger: 0.08, delay: 0.3 });
+  }
+}

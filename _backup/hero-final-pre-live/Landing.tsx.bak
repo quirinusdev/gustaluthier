@@ -1,0 +1,123 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
+import GuitarStage from "./GuitarStage";
+import {
+  AboutPanel, Brand, CredibilitySection, CtaSection, IntroPanel, QuoteSection, ServicesPanel,
+} from "./Sections";
+import { IconClose, IconMenu } from "./Icons";
+import { CONTENT } from "@/lib/content";
+import { buildNarrative } from "@/lib/narrative";
+
+gsap.registerPlugin(ScrollTrigger, useGSAP);
+
+function Header() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  return (
+    <header className="site-header">
+      <a className="header-brand" href="#inicio" aria-label="Gusta Luthieria — início">
+        <Brand compact />
+      </a>
+      <button className="menu-btn" type="button" aria-expanded={open} aria-controls="site-nav" aria-label={open ? "Fechar menu" : "Abrir menu"} onClick={() => setOpen((o) => !o)}>
+        {open ? <IconClose /> : <IconMenu />}
+      </button>
+      <nav id="site-nav" className={`site-nav ${open ? "is-open" : ""}`} aria-label="Seções" inert={!open}>
+        <ul>
+          {CONTENT.nav.map((n) => (
+            <li key={n.href}><a href={n.href} onClick={() => setOpen(false)}>{n.label}</a></li>
+          ))}
+        </ul>
+      </nav>
+    </header>
+  );
+}
+
+export default function Landing() {
+  const root = useRef<HTMLElement>(null);
+  const [build, setBuild] = useState(0);
+  const [assetsReady, setAssetsReady] = useState(false);
+
+  // Pré-carrega/decodifica os layers do hero exploded antes de criar o ScrollTrigger
+  useEffect(() => {
+    const imgs = Array.from(root.current?.querySelectorAll<HTMLImageElement>(".rig img") ?? []);
+    let alive = true;
+    Promise.allSettled(imgs.map((img) => img.decode())).then(() => alive && setAssetsReady(true));
+    return () => { alive = false; };
+  }, []);
+
+  // Rolagem suave apenas para âncoras internas (menu/CTAs). Não usar scroll-behavior no CSS:
+  // ele transformaria as restaurações de posição do ScrollTrigger.refresh() em rolagens animadas.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as Element | null)?.closest<HTMLAnchorElement>('a[href^="#"]');
+      const target = a && a.hash.length > 1 ? document.querySelector(a.hash) : null;
+      if (!a || !target) return;
+      e.preventDefault();
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      target.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+      history.replaceState(null, "", a.hash);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
+
+  // Reconstrói a narrativa quando o layout muda de verdade (largura, rotação, fontes).
+  useEffect(() => {
+    ScrollTrigger.config({ ignoreMobileResize: true });
+    let w = window.innerWidth, h = window.innerHeight, t = 0;
+    const onResize = () => {
+      const dw = Math.abs(window.innerWidth - w), dh = Math.abs(window.innerHeight - h);
+      if (dw < 2 && dh < 140) return; // barra de endereço do mobile não reconstrói
+      w = window.innerWidth; h = window.innerHeight;
+      clearTimeout(t);
+      t = window.setTimeout(() => setBuild((b) => b + 1), 180);
+    };
+    window.addEventListener("resize", onResize);
+    document.fonts?.ready.then(() => setBuild((b) => b + 1));
+    return () => { window.removeEventListener("resize", onResize); clearTimeout(t); };
+  }, []);
+
+  useGSAP(
+    () => {
+      const el = root.current!;
+      const mm = gsap.matchMedia();
+      mm.add(
+        { motion: "(prefers-reduced-motion: no-preference)", reduce: "(prefers-reduced-motion: reduce)" },
+        (ctx) => {
+          buildNarrative(el, !!ctx.conditions?.motion, assetsReady);
+          if (assetsReady) ScrollTrigger.refresh();
+        },
+      );
+      el.classList.add("is-ready");
+      return () => mm.revert();
+    },
+    { scope: root, dependencies: [build, assetsReady], revertOnUpdate: true },
+  );
+
+  return (
+    <>
+      <Header />
+      <main ref={root} className="page">
+        <GuitarStage />
+        <div className="flow">
+          <IntroPanel />
+          <AboutPanel />
+          <ServicesPanel />
+          <CredibilitySection />
+          <QuoteSection />
+          <CtaSection />
+        </div>
+      </main>
+    </>
+  );
+}

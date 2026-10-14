@@ -1,0 +1,132 @@
+{
+  "canvas": {
+    "w": 941,
+    "h": 1672
+  },
+  "layers": {
+    "00_static_core_remainder": [
+      200,
+      88,
+      871,
+      1447
+    ],
+    "01_upper_left_hardware": [
+      106,
+      275,
+      376,
+      666
+    ],
+    "02_left_body_shell": [
+      168,
+      586,
+      451,
+      1306
+    ],
+    "03_top_right_plate": [
+      438,
+      331,
+      638,
+      520
+    ],
+    "04_center_electronics": [
+      398,
+      681,
+      676,
+      1171
+    ],
+    "05_right_pickguard": [
+      564,
+      646,
+      809,
+      1048
+    ],
+    "06_lower_right_controls": [
+      622,
+      900,
+      903,
+      1428
+    ],
+    "07_lower_shell_hardware": [
+      365,
+      1112,
+      695,
+      1473
+    ],
+    "08_left_lower_hardware": [
+      44,
+      591,
+      307,
+      1331
+    ]
+  },
+  "defringe": {
+    "thr": 16,
+    "depth": 20,
+    "pixels": 67125
+  },
+  "seamBleed": 28,
+  "seams": {
+    "00_static_core_remainder": [
+      220,
+      275,
+      877,
+      1443
+    ],
+    "01_upper_left_hardware": [
+      90,
+      247,
+      404,
+      694
+    ],
+    "02_left_body_shell": [
+      140,
+      558,
+      479,
+      1334
+    ],
+    "03_top_right_plate": [
+      414,
+      479,
+      609,
+      548
+    ],
+    "04_center_electronics": [
+      370,
+      653,
+      704,
+      1199
+    ],
+    "05_right_pickguard": [
+      536,
+      618,
+      816,
+      1076
+    ],
+    "06_lower_right_controls": [
+      594,
+      947,
+      871,
+      1433
+    ],
+    "07_lower_shell_hardware": [
+      337,
+      1084,
+      710,
+      1447
+    ],
+    "08_left_lower_hardware": [
+      118,
+      574,
+      335,
+      1316
+    ]
+  },
+  "video": true,
+  "videoMobile": false,
+  "videoSource": "hero animado/c.mp4",
+  "videoProcessing": {
+    "darken": 0.38,
+    "loopCrossfadeSec": 2.0,
+    "loopSec": 6.0
+  }
+}

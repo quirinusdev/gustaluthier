@@ -1,0 +1,56 @@
+import { CANVAS, CTA_PHOTO, LAYER_ORDER } from "@/lib/scene";
+
+const H = "/assets/hero";
+const SERVICES = ["regulagem", "manutencao", "customizacao"];
+
+/**
+ * Stage da narrativa — HERO EXPLODED FINAL (Gusta_Hero_Exploded_FINAL_Assets).
+ * rig/câmera: hero_background_dark_smoke → 00_static_core_remainder → 8 layers móveis (z-index do JSON)
+ * → véu. Todos os layers em canvas inteiro 941×1672, inset:0, transform identity no estado inicial.
+ * Acima: degradês de leitura → vinheta → grain → linhas + hotspots.
+ * A guitarra montada (.cta-rig) existe só para o fechamento e fica invisível durante o exploded.
+ */
+export default function GuitarStage() {
+  return (
+    <div className="stage" aria-hidden="true">
+      <div className="stage-inner">
+        <div className="stage-bg" />
+        <div className="cta-rig" style={{ width: CTA_PHOTO.w, height: CTA_PHOTO.h }}>
+          <img src="/assets/scene.webp" width={CTA_PHOTO.w} height={CTA_PHOTO.h} alt="" loading="lazy" decoding="async" />
+        </div>
+        <div className="rig" style={{ width: CANVAS.w, height: CANVAS.h }}>
+          <img className="hero-layer" src={`${H}/hero_background_dark_smoke.jpg`} style={{ zIndex: 0 }} alt="" decoding="async" />
+          {LAYER_ORDER.map((id, i) => (
+            <img
+              key={id}
+              className="hero-layer"
+              data-layer={id}
+              src={`${H}/${id}.webp`}
+              style={{ zIndex: i + 1 }}
+              alt=""
+              decoding="async"
+              fetchPriority={i === 0 ? "high" : undefined}
+            />
+          ))}
+          <div className="dim" style={{ zIndex: LAYER_ORDER.length + 1 }} />
+          <div className="rig-edge" style={{ zIndex: LAYER_ORDER.length + 2 }} />
+        </div>
+        <div className="shade shade-top" />
+        <div className="shade shade-bottom" />
+        <div className="shade shade-full" />
+        <div className="vignette" />
+        <div className="grain" />
+        <svg className="leaders" width="100%" height="100%">
+          {SERVICES.map((id) => (
+            <path key={id} data-line={id} pathLength={1} />
+          ))}
+        </svg>
+        {SERVICES.map((id) => (
+          <div key={id} className="hotspot" data-hotspot={id}>
+            <img src={`${H}/hotspot.svg`} alt="" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
