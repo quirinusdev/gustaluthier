@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { asset } from "@/lib/base";
 
-const L = "/assets/hero-live";
+const L = asset("/assets/hero-live");
 
 /**
  * Camada 0 do hero: fumaça em vídeo, atrás de tudo, sem nenhum vínculo com o ScrollTrigger/GSAP.

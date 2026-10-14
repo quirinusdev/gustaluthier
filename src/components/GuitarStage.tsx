@@ -1,7 +1,8 @@
 import { CANVAS, FOCUS_ZONES, HERO_MEDIA, LAYER_ORDER, SEAM_BOX, layerCenter, type ServiceId } from "@/lib/scene";
 import HeroBackground from "./HeroBackground";
+import { asset } from "@/lib/base";
 
-const L = "/assets/hero-live";
+const L = asset("/assets/hero-live");
 const SERVICES: ServiceId[] = ["regulagem", "manutencao", "customizacao"];
 const GLOW_R = 240; // raio do focus_glow_soft no canvas (≈ 94 px de tela no hero mobile)
 

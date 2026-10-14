@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 import { CONTENT } from "@/lib/content";
+import { asset } from "@/lib/base";
 import QuoteForm from "./QuoteForm";
 import { instagramHref, isExternal, whatsappHref } from "@/lib/site";
 import {
@@ -31,7 +32,7 @@ function ext(href: string) {
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <span className={`brand ${compact ? "brand--compact" : ""}`}>
-      <img className="brand-mark" src="/assets/logo-mark.webp" alt="" width={88} height={129} />
+      <img className="brand-mark" src={asset("/assets/logo-mark.webp")} alt="" width={88} height={129} />
       <span className="brand-text">
         <span className="brand-name">Gusta</span>
         <span className="brand-sub">Luthieria</span>

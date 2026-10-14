@@ -6,6 +6,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { CONTENT } from "@/lib/content";
+import { asset } from "@/lib/base";
 import { IconClose, IconExpand, IconPlay } from "./Icons";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
@@ -13,7 +14,7 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 /* Assets oficiais: Gusta_Resultados_Assets_v2 (01_VIDEOS + 02_POSTERS), copiados sem alteração.
  * video = preview leve do card (sem áudio). full = versão própria da tela cheia (com áudio), carregada só ao abrir;
  * fullOffset = onde o trecho do preview começa dentro da versão completa (s), para continuar do mesmo momento. */
-const DIR = "/assets/resultados";
+const DIR = asset("/assets/resultados");
 type Item = { video: string; poster: string; full?: string; fullOffset?: number };
 const ITEMS: Item[] = [
   { video: `${DIR}/resultado_01_guitarra_creme_vertical.mp4`, poster: `${DIR}/resultado_01_poster.jpg` },

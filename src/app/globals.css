@@ -104,8 +104,8 @@ html:not(.js) .rig { transform: translate(calc(50vw - 183px), 4vh) scale(0.39); 
 .shade-top { background: linear-gradient(to bottom, rgba(13, 13, 13, 0.96) 0%, rgba(13, 13, 13, 0.7) 22%, rgba(13, 13, 13, 0) 44%); }
 .shade-bottom { opacity: 1; background: linear-gradient(to top, rgba(13, 13, 13, 0.98) 0%, rgba(13, 13, 13, 0.82) 24%, rgba(13, 13, 13, 0) 46%); }
 .shade-full { background: rgba(10, 10, 10, 0.92); }
-.vignette { position: absolute; inset: 0; background: url(/assets/fx-vignette.webp) center / 100% 100% no-repeat; opacity: 0.75; }
-.grain { position: absolute; inset: 0; background: url(/assets/fx-grain_subtle.webp) repeat; background-size: 256px; opacity: 0.45; }
+.vignette { position: absolute; inset: 0; background: url("../../public/assets/fx-vignette.webp") center / 100% 100% no-repeat; opacity: 0.75; }
+.grain { position: absolute; inset: 0; background: url("../../public/assets/fx-grain_subtle.webp") repeat; background-size: 256px; opacity: 0.45; }
 
 /* seta (camada 3): só transform/opacity, tudo no compositor — antes era um <path> SVG reescrito a cada
    frame (layout + paint com drop-shadow). Âncora na borda do card, girada até o hotspot (living.ts). */
